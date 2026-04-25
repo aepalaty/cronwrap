@@ -13,7 +13,21 @@ def attach_audit_hooks(
 ) -> AuditWriter:
     """Register post and failure hooks that persist audit entries.
 
-    Returns the AuditWriter so callers can inspect written records.
+    Both the ``post`` and ``on_failure`` hooks write an :class:`AuditEntry`
+    derived from the current :class:`~cronwrap.context.ExecutionContext`.
+    Registering on both hooks ensures an entry is recorded regardless of
+    whether the job succeeded or raised an exception.
+
+    Args:
+        registry: The hook registry to attach the audit hooks to.
+        config: Optional audit configuration.  A default
+            :class:`~cronwrap.audit.AuditConfig` is used when *None*.
+        writer: An existing :class:`~cronwrap.audit.AuditWriter` to reuse.
+            When *None* a new writer is created from *config*.
+
+    Returns:
+        The :class:`~cronwrap.audit.AuditWriter` used to persist entries so
+        callers can inspect or assert on written records.
     """
     if writer is None:
         writer = AuditWriter(config or AuditConfig())
