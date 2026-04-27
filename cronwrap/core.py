@@ -71,6 +71,14 @@ class CronWrapper:
             timeout: Maximum seconds to allow the command to run before killing it.
             job_name: Optional human-readable name for this job used in logs.
         """
+        if not command:
+            raise ValueError("command must be a non-empty list of strings")
+        if retries < 0:
+            raise ValueError("retries must be a non-negative integer")
+        if retry_delay < 0:
+            raise ValueError("retry_delay must be a non-negative number")
+        if timeout is not None and timeout <= 0:
+            raise ValueError("timeout must be a positive number")
         self.command = command
         self.retries = retries
         self.retry_delay = retry_delay
@@ -98,77 +106,4 @@ class CronWrapper:
                 },
             )
 
-            last_result = self._execute(attempt)
-
-            if last_result.success:
-                logger.info(
-                    "Job completed successfully",
-                    extra={
-                        "job_name": self.job_name,
-                        "duration_seconds": last_result.duration_seconds,
-                        "attempt": attempt,
-                    },
-                )
-                return last_result
-
-            logger.warning(
-                "Job failed",
-                extra={
-                    "job_name": self.job_name,
-                    "exit_code": last_result.exit_code,
-                    "attempt": attempt,
-                    "stderr": last_result.stderr[:500],  # truncate for log safety
-                },
-            )
-
-            if attempt < max_attempts:
-                logger.info(
-                    "Retrying after delay",
-                    extra={"job_name": self.job_name, "retry_delay": self.retry_delay},
-                )
-                time.sleep(self.retry_delay)
-
-        return last_result  # type: ignore[return-value]
-
-    def _execute(self, attempt: int) -> CronJobResult:
-        """Run the command once and return a CronJobResult."""
-        started_at = datetime.utcnow()
-        start_time = time.monotonic()
-
-        try:
-            proc = subprocess.run(
-                self.command,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-            )
-            exit_code = proc.returncode
-            stdout = proc.stdout
-            stderr = proc.stderr
-        except subprocess.TimeoutExpired as exc:
-            exit_code = -1
-            stdout = exc.stdout or ""
-            stderr = f"TimeoutExpired: command exceeded {self.timeout}s"
-            logger.error(
-                "Job timed out",
-                extra={"job_name": self.job_name, "timeout": self.timeout},
-            )
-        except Exception as exc:  # pylint: disable=broad-except
-            exit_code = -1
-            stdout = ""
-            stderr = f"Unexpected error: {exc}"
-            logger.exception("Unexpected error executing job", extra={"job_name": self.job_name})
-
-        finished_at = datetime.utcnow()
-        duration = time.monotonic() - start_time
-
-        return CronJobResult(
-            command=" ".join(self.command),
-            exit_code=exit_code,
-            stdout=stdout,
-            stderr=stderr,
-            duration_seconds=duration,
-            attempt=attempt,
-            started_at=started_at,
-            finished_at=finished_at,
-        )
+          
